@@ -331,10 +331,13 @@ function renderTrades(trades) {
   const tbody = document.querySelector("#trades-table tbody");
   const rows = trades.slice().reverse().slice(0, 50).map((t) => {
     const pnlCls = t.pnlPct >= 0 ? "pnl-pos" : "pnl-neg";
+    const sideCls = t.side === "多" ? "side-long" : "side-short";
     return `<tr>
-      <td>${t.side}</td>
-      <td>${fmtTime(t.entryTime)}<br>${fmt(t.entryPrice, 2)}</td>
-      <td>${fmtTime(t.exitTime)}<br>${fmt(t.exitPrice, 2)}</td>
+      <td class="${sideCls}">${t.side}</td>
+      <td>${fmtTime(t.entryTime)}</td>
+      <td>${fmt(t.entryPrice, 2)}</td>
+      <td>${fmtTime(t.exitTime)}</td>
+      <td>${fmt(t.exitPrice, 2)}</td>
       <td>${t.note}</td>
       <td class="${pnlCls}">${t.pnlPct.toFixed(2) + "%"}</td>
     </tr>`;

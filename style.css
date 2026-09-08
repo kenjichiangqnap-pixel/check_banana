@@ -179,6 +179,12 @@ th { color: var(--muted); font-weight: 500; }
 .pnl-pos { color: var(--green); }
 .pnl-neg { color: var(--red); }
 
+.side-long { color: var(--green); font-weight: 700; }
+.side-short { color: var(--red); font-weight: 700; }
+
+#trades-table tbody tr { border-bottom: 1px solid var(--border); }
+#trades-table tbody tr:hover { background: #1f232c; }
+
 .error-box {
   background: #3a1a1a;
   border: 1px solid var(--red);
