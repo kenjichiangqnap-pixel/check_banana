@@ -3,9 +3,9 @@
 /* ===== 密碼保護（僅為避免連結外流被隨意瀏覽，非銀行等級加密）=====
    要更換密碼：在瀏覽器主控台執行
    crypto.subtle.digest('SHA-256', new TextEncoder().encode('你的新密碼')).then(b=>console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')))
-   把結果貼到下面 PASSWORD_HASH。預設密碼是 changeme123，部署前請務必更改。
+   把結果貼到下面 PASSWORD_HASH。
 */
-const PASSWORD_HASH = "494a715f7e9b4071aca61bac42ca858a309524e5864f0920030862a4ae7589be";
+const PASSWORD_HASH = "0f14089313b20c1723ec1d660b0aaa4f473cf5b321cd370f2d48b7bcf9a7b234";
 
 async function sha256Hex(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
