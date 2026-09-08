@@ -27,6 +27,10 @@ body {
   justify-content: center;
 }
 
+#gate[hidden] {
+  display: none;
+}
+
 #gate-form {
   background: var(--card);
   border: 1px solid var(--border);
@@ -91,13 +95,15 @@ body {
 
 .quick-status .qs-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 .quick-status .qs-grid.qs-grid-1 { grid-template-columns: 1fr; }
 
 .quick-status .qs-item .qs-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
 .quick-status .qs-item .qs-value { font-size: 17px; font-weight: 700; }
+.quick-status .qs-item .qs-value.up { color: var(--green); }
+.quick-status .qs-item .qs-value.down { color: var(--red); }
 
 header {
   display: flex;

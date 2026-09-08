@@ -165,19 +165,11 @@ function runSimulation(bars, ind) {
   let position = 0, signal = "";
   let buy_price = 0, sell_price = 0, stop_price = 0, take_price = 0, trail_extreme = 0;
   let qty = 0, entry_fee = 0, entry_total_u = 0;
-  let total = 0, w = 0, l = 0, count = 0, count_w = 0, count_l = 0;
-  let topM = 0, downM = 0, topTime = null, downFromTime = null, downToTime = null, downFromValue = 0;
-  let cdcount = 0, cdwcount = 0, pdcount = 0, pdwcount = 0;
   const trades = [];
 
   for (let i = 1; i < n; i++) {
     const ADX = adx[i], emaT = ema_trend[i], dh = dch_hi[i], dl = dch_lo[i], atrb = atr_b[i];
     const closeNow = close[i], highNow = high[i], lowNow = low[i];
-
-    if (usdt > topM) { topM = usdt; topTime = bars[i].openTime; }
-    if (topM > 0 && (topM - usdt) / topM > downM) {
-      downFromTime = topTime; downToTime = bars[i].openTime; downM = (topM - usdt) / topM; downFromValue = topM;
-    }
 
     if (position === 1 && signal === "buy") {
       if (highNow > trail_extreme) trail_extreme = highNow;
@@ -193,12 +185,8 @@ function runSimulation(bars, ind) {
         const feeOut = CONFIG.FEE_RATE * exitPrice * qty;
         usdt += raw - feeOut;
         const b = raw - feeOut - entry_fee;
-        total += b;
         const reason = usdt <= 0 ? "爆倉" : b > 0 ? "停利" : "停損";
-        if (b > 0) { w += b; count_w++; } else { l += b; if (reason === "爆倉") count_l++; }
-        cdcount++; if (b > 0) cdwcount++;
-        count++;
-        trades.push({ time: bars[i].openTime, side: "多", action: "賣出", price: exitPrice, note: reason, pnl: b, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0, usdtAfter: usdt });
+        trades.push({ time: bars[i].openTime, side: "多", action: "賣出", price: exitPrice, note: reason, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0 });
         position = 0; signal = "";
       }
     } else if (position === 1 && signal === "sell") {
@@ -215,12 +203,8 @@ function runSimulation(bars, ind) {
         const feeOut = CONFIG.FEE_RATE * exitPrice * qty;
         usdt += raw - feeOut;
         const b = raw - feeOut - entry_fee;
-        total += b;
         const reason = usdt <= 0 ? "爆倉" : b > 0 ? "停利" : "停損";
-        if (b > 0) { w += b; count_w++; } else { l += b; if (reason === "爆倉") count_l++; }
-        pdcount++; if (b > 0) pdwcount++;
-        count++;
-        trades.push({ time: bars[i].openTime, side: "空", action: "買回", price: exitPrice, note: reason, pnl: b, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0, usdtAfter: usdt });
+        trades.push({ time: bars[i].openTime, side: "空", action: "買回", price: exitPrice, note: reason, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0 });
         position = 0; signal = "";
       }
     }
@@ -242,25 +226,20 @@ function runSimulation(bars, ind) {
         entry_fee = CONFIG.FEE_RATE * notional;
         usdt -= entry_fee;
         entry_total_u = eq0;
-        const levNow = eq0 > 0 ? notional / eq0 : 0;
         if (longSig) {
           position = 1; signal = "buy"; buy_price = closeNow; trail_extreme = highNow;
           stop_price = buy_price - stopDist; take_price = buy_price + CONFIG.ATR_TP * atrb;
-          trades.push({ time: bars[i].openTime, side: "多", action: "買入", price: buy_price, note: `名目${Math.round(notional)}U 槓桿${levNow.toFixed(2)}倍`, pnl: null, pnlPct: null, usdtAfter: usdt });
+          trades.push({ time: bars[i].openTime, side: "多", action: "買入", price: buy_price, note: "進場", pnlPct: null });
         } else {
           position = 1; signal = "sell"; sell_price = closeNow; trail_extreme = lowNow;
           stop_price = sell_price + stopDist; take_price = sell_price - CONFIG.ATR_TP * atrb;
-          trades.push({ time: bars[i].openTime, side: "空", action: "賣出", price: sell_price, note: `名目${Math.round(notional)}U 槓桿${levNow.toFixed(2)}倍`, pnl: null, pnlPct: null, usdtAfter: usdt });
+          trades.push({ time: bars[i].openTime, side: "空", action: "賣出", price: sell_price, note: "進場", pnlPct: null });
         }
       }
     }
   }
 
-  return {
-    usdt, position, signal, buy_price, sell_price, stop_price, take_price, trail_extreme, qty, entry_total_u,
-    total, w, l, count, count_w, count_l, topM, downM, topTime, downFromTime, downToTime, downFromValue,
-    cdcount, cdwcount, pdcount, pdwcount, trades,
-  };
+  return { position, signal, buy_price, sell_price, stop_price, qty, entry_total_u, trades };
 }
 
 /* ===== 畫面渲染 ===== */
@@ -290,12 +269,15 @@ function renderQuickStatus(result, lastClose) {
   }
   const isLong = result.signal === "buy";
   const entry = isLong ? result.buy_price : result.sell_price;
+  const unrealized = isLong ? (lastClose - entry) * result.qty : (entry - lastClose) * result.qty;
+  const pnlPct = result.entry_total_u > 0 ? (unrealized / result.entry_total_u) * 100 : 0;
   box.innerHTML = `
     <div class="qs-side ${isLong ? "long" : "short"}">${isLong ? "做多" : "做空"} BTCUSDT</div>
     <div class="qs-grid">
-      <div class="qs-item"><div class="qs-label">進場價</div><div class="qs-value">${fmt(entry, 2)}</div></div>
-      <div class="qs-item"><div class="qs-label">停損價</div><div class="qs-value">${fmt(result.stop_price, 2)}</div></div>
+      <div class="qs-item"><div class="qs-label">進場點位</div><div class="qs-value">${fmt(entry, 2)}</div></div>
+      <div class="qs-item"><div class="qs-label">出場點位（停損）</div><div class="qs-value">${fmt(result.stop_price, 2)}</div></div>
       <div class="qs-item"><div class="qs-label">目前價</div><div class="qs-value">${fmt(lastClose, 2)}</div></div>
+      <div class="qs-item"><div class="qs-label">盈虧%</div><div class="qs-value ${pnlPct >= 0 ? "up" : "down"}">${pnlPct.toFixed(2)}%</div></div>
     </div>
   `;
 }
@@ -315,24 +297,16 @@ function renderStatus(result, lastBar, ind, n) {
 
   const isLong = result.signal === "buy";
   const entry = isLong ? result.buy_price : result.sell_price;
-  const unrealized = isLong
-    ? (lastClose - entry) * result.qty - 0
-    : (entry - lastClose) * result.qty - 0;
-  const unrealizedPct = result.entry_total_u > 0 ? (unrealized / result.entry_total_u) * 100 : 0;
-  const notional = result.qty * entry;
-  const leverage = result.entry_total_u > 0 ? notional / result.entry_total_u : 0;
+  const unrealized = isLong ? (lastClose - entry) * result.qty : (entry - lastClose) * result.qty;
+  const pnlPct = result.entry_total_u > 0 ? (unrealized / result.entry_total_u) * 100 : 0;
 
   box.innerHTML = `
     <div class="status-title ${isLong ? "long" : "short"}">目前持倉：${isLong ? "做多" : "做空"} BTCUSDT</div>
     <div class="grid">
-      ${statBox("進場價", fmt(entry, 2))}
+      ${statBox("進場點位", fmt(entry, 2))}
+      ${statBox("出場點位（停損）", fmt(result.stop_price, 2))}
       ${statBox("目前價", fmt(lastClose, 2))}
-      ${statBox("目前停損價（吊燈）", fmt(result.stop_price, 2))}
-      ${statBox("數量 (BTC)", fmt(result.qty, 4))}
-      ${statBox("名目價值", fmt(notional, 0) + " U")}
-      ${statBox("槓桿", leverage.toFixed(2) + " 倍")}
-      ${statBox("未實現損益", fmt(unrealized, 0) + " U", unrealized >= 0 ? "up" : "down")}
-      ${statBox("未實現報酬率", unrealizedPct.toFixed(2) + " %", unrealizedPct >= 0 ? "up" : "down")}
+      ${statBox("盈虧%", pnlPct.toFixed(2) + " %", pnlPct >= 0 ? "up" : "down")}
     </div>
     <p style="margin-top:12px;color:var(--muted);font-size:13px;">
       若價格${isLong ? "跌破" : "漲破"}停損價 <strong>${fmt(result.stop_price, 2)}</strong>，請手動平倉。
@@ -354,40 +328,17 @@ function renderIndicators(ind, n, lastBar) {
   ].join("");
 }
 
-function renderStats(r) {
-  const grid = document.getElementById("stats-grid");
-  const winRate = r.count > 0 ? (r.count_w / r.count) * 100 : 0;
-  const payoffRatio = r.l !== 0 ? (-1 * r.w) / r.l : 0;
-  const totalReturnPct = (r.total * 100) / CONFIG.initialUsdt;
-  const maxReturnPct = ((r.topM - CONFIG.initialUsdt) * 100) / CONFIG.initialUsdt;
-
-  grid.innerHTML = [
-    statBox("進場次數", `${r.count} 次（多 ${r.cdcount} / 空 ${r.pdcount}）`),
-    statBox("勝率", winRate.toFixed(1) + " %"),
-    statBox("盈虧比", payoffRatio.toFixed(2)),
-    statBox("爆倉次數", r.count_l + " 次"),
-    statBox("目前總U", fmt(r.usdt, 0) + " U"),
-    statBox("目前總盈虧", fmt(r.total, 0) + " U", r.total >= 0 ? "up" : "down"),
-    statBox("總報酬率", totalReturnPct.toFixed(2) + " %", totalReturnPct >= 0 ? "up" : "down"),
-    statBox("最大總資產", fmt(r.topM, 0) + " U（" + (r.topTime ? fmtTime(r.topTime) : "-") + "）"),
-    statBox("最大報酬率", maxReturnPct.toFixed(2) + " %"),
-    statBox("最大回落", (r.downM * 100).toFixed(1) + " %"),
-  ].join("");
-}
-
 function renderTrades(trades) {
   const tbody = document.querySelector("#trades-table tbody");
   const rows = trades.slice().reverse().slice(0, 50).map((t) => {
-    const pnlCls = t.pnl === null ? "" : t.pnl >= 0 ? "pnl-pos" : "pnl-neg";
+    const pnlCls = t.pnlPct === null ? "" : t.pnlPct >= 0 ? "pnl-pos" : "pnl-neg";
     return `<tr>
       <td>${fmtTime(t.time)}</td>
       <td>${t.side}</td>
       <td>${t.action}</td>
       <td>${fmt(t.price, 2)}</td>
-      <td>${t.note}</td>
-      <td class="${pnlCls}">${t.pnl === null ? "-" : fmt(t.pnl, 0)}</td>
+      <td>${t.note || "-"}</td>
       <td class="${pnlCls}">${t.pnlPct === null ? "-" : t.pnlPct.toFixed(2) + "%"}</td>
-      <td>${fmt(t.usdtAfter, 0)}</td>
     </tr>`;
   });
   tbody.innerHTML = rows.join("");
@@ -428,7 +379,6 @@ async function loadAndRender() {
     renderQuickStatus(result, ind.close[n - 1]);
     renderStatus(result, bars[n - 1], ind, n);
     renderIndicators(ind, n, bars[n - 1]);
-    renderStats(result);
     renderTrades(result.trades);
 
     document.getElementById("last-updated").textContent = "資料更新於：" + new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false });
