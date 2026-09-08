@@ -238,7 +238,7 @@ function runSimulation(bars, ind) {
     }
   }
 
-  return { position, signal, buy_price, sell_price, stop_price, qty, entry_total_u, trades };
+  return { position, signal, buy_price, sell_price, stop_price, qty, entry_total_u, entry_time, trades };
 }
 
 /* ===== 畫面渲染 ===== */
@@ -255,6 +255,13 @@ function statBox(label, value, cls = "") {
   return `<div class="stat"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
 }
 
+function openPositionPnlPct(result, lastClose) {
+  const isLong = result.signal === "buy";
+  const entry = isLong ? result.buy_price : result.sell_price;
+  const unrealized = isLong ? (lastClose - entry) * result.qty : (entry - lastClose) * result.qty;
+  return result.entry_total_u > 0 ? (unrealized / result.entry_total_u) * 100 : 0;
+}
+
 function renderQuickStatus(result, lastClose) {
   const box = document.getElementById("quick-status");
   if (result.position === 0) {
@@ -268,8 +275,7 @@ function renderQuickStatus(result, lastClose) {
   }
   const isLong = result.signal === "buy";
   const entry = isLong ? result.buy_price : result.sell_price;
-  const unrealized = isLong ? (lastClose - entry) * result.qty : (entry - lastClose) * result.qty;
-  const pnlPct = result.entry_total_u > 0 ? (unrealized / result.entry_total_u) * 100 : 0;
+  const pnlPct = openPositionPnlPct(result, lastClose);
   box.innerHTML = `
     <div class="qs-side ${isLong ? "long" : "short"}">${isLong ? "做多" : "做空"} BTCUSDT</div>
     <div class="qs-grid">
@@ -296,8 +302,7 @@ function renderStatus(result, lastBar, ind, n) {
 
   const isLong = result.signal === "buy";
   const entry = isLong ? result.buy_price : result.sell_price;
-  const unrealized = isLong ? (lastClose - entry) * result.qty : (entry - lastClose) * result.qty;
-  const pnlPct = result.entry_total_u > 0 ? (unrealized / result.entry_total_u) * 100 : 0;
+  const pnlPct = openPositionPnlPct(result, lastClose);
 
   box.innerHTML = `
     <div class="status-title ${isLong ? "long" : "short"}">目前持倉：${isLong ? "做多" : "做空"} BTCUSDT</div>
@@ -336,8 +341,8 @@ function renderTrades(trades) {
       <td class="${sideCls}">${t.side}</td>
       <td>${fmtTime(t.entryTime)}</td>
       <td>${fmt(t.entryPrice, 2)}</td>
-      <td>${fmtTime(t.exitTime)}</td>
-      <td>${fmt(t.exitPrice, 2)}</td>
+      <td>${t.exitTime === null ? "--" : fmtTime(t.exitTime)}</td>
+      <td>${t.exitPrice === null ? "--" : fmt(t.exitPrice, 2)}</td>
       <td>${t.note}</td>
       <td class="${pnlCls}">${t.pnlPct.toFixed(2) + "%"}</td>
     </tr>`;
@@ -377,10 +382,24 @@ async function loadAndRender() {
     const result = runSimulation(bars, ind);
     const n = bars.length;
 
-    renderQuickStatus(result, ind.close[n - 1]);
+    const lastClose = ind.close[n - 1];
+    renderQuickStatus(result, lastClose);
     renderStatus(result, bars[n - 1], ind, n);
     renderIndicators(ind, n, bars[n - 1]);
-    renderTrades(result.trades);
+
+    let tradesForTable = result.trades;
+    if (result.position !== 0) {
+      tradesForTable = tradesForTable.concat([{
+        side: result.signal === "buy" ? "多" : "空",
+        entryTime: result.entry_time,
+        entryPrice: result.signal === "buy" ? result.buy_price : result.sell_price,
+        exitTime: null,
+        exitPrice: null,
+        note: "持倉中",
+        pnlPct: openPositionPnlPct(result, lastClose),
+      }]);
+    }
+    renderTrades(tradesForTable);
 
     document.getElementById("last-updated").textContent = "資料更新於：" + new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false });
   } catch (e) {
