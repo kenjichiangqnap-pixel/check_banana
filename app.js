@@ -164,7 +164,7 @@ function runSimulation(bars, ind) {
   let usdt = CONFIG.initialUsdt;
   let position = 0, signal = "";
   let buy_price = 0, sell_price = 0, stop_price = 0, take_price = 0, trail_extreme = 0;
-  let qty = 0, entry_fee = 0, entry_total_u = 0;
+  let qty = 0, entry_fee = 0, entry_total_u = 0, entry_time = null;
   const trades = [];
 
   for (let i = 1; i < n; i++) {
@@ -186,7 +186,7 @@ function runSimulation(bars, ind) {
         usdt += raw - feeOut;
         const b = raw - feeOut - entry_fee;
         const reason = usdt <= 0 ? "爆倉" : b > 0 ? "停利" : "停損";
-        trades.push({ time: bars[i].openTime, side: "多", action: "賣出", price: exitPrice, note: reason, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0 });
+        trades.push({ side: "多", entryTime: entry_time, entryPrice: buy_price, exitTime: bars[i].openTime, exitPrice, note: reason, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0 });
         position = 0; signal = "";
       }
     } else if (position === 1 && signal === "sell") {
@@ -204,7 +204,7 @@ function runSimulation(bars, ind) {
         usdt += raw - feeOut;
         const b = raw - feeOut - entry_fee;
         const reason = usdt <= 0 ? "爆倉" : b > 0 ? "停利" : "停損";
-        trades.push({ time: bars[i].openTime, side: "空", action: "買回", price: exitPrice, note: reason, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0 });
+        trades.push({ side: "空", entryTime: entry_time, entryPrice: sell_price, exitTime: bars[i].openTime, exitPrice, note: reason, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0 });
         position = 0; signal = "";
       }
     }
@@ -226,14 +226,13 @@ function runSimulation(bars, ind) {
         entry_fee = CONFIG.FEE_RATE * notional;
         usdt -= entry_fee;
         entry_total_u = eq0;
+        entry_time = bars[i].openTime;
         if (longSig) {
           position = 1; signal = "buy"; buy_price = closeNow; trail_extreme = highNow;
           stop_price = buy_price - stopDist; take_price = buy_price + CONFIG.ATR_TP * atrb;
-          trades.push({ time: bars[i].openTime, side: "多", action: "買入", price: buy_price, note: "進場", pnlPct: null });
         } else {
           position = 1; signal = "sell"; sell_price = closeNow; trail_extreme = lowNow;
           stop_price = sell_price + stopDist; take_price = sell_price - CONFIG.ATR_TP * atrb;
-          trades.push({ time: bars[i].openTime, side: "空", action: "賣出", price: sell_price, note: "進場", pnlPct: null });
         }
       }
     }
@@ -331,14 +330,13 @@ function renderIndicators(ind, n, lastBar) {
 function renderTrades(trades) {
   const tbody = document.querySelector("#trades-table tbody");
   const rows = trades.slice().reverse().slice(0, 50).map((t) => {
-    const pnlCls = t.pnlPct === null ? "" : t.pnlPct >= 0 ? "pnl-pos" : "pnl-neg";
+    const pnlCls = t.pnlPct >= 0 ? "pnl-pos" : "pnl-neg";
     return `<tr>
-      <td>${fmtTime(t.time)}</td>
       <td>${t.side}</td>
-      <td>${t.action}</td>
-      <td>${fmt(t.price, 2)}</td>
-      <td>${t.note || "-"}</td>
-      <td class="${pnlCls}">${t.pnlPct === null ? "-" : t.pnlPct.toFixed(2) + "%"}</td>
+      <td>${fmtTime(t.entryTime)}<br>${fmt(t.entryPrice, 2)}</td>
+      <td>${fmtTime(t.exitTime)}<br>${fmt(t.exitPrice, 2)}</td>
+      <td>${t.note}</td>
+      <td class="${pnlCls}">${t.pnlPct.toFixed(2) + "%"}</td>
     </tr>`;
   });
   tbody.innerHTML = rows.join("");
