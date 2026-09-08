@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>BTC 策略儀表板</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="gate">
+  <form id="gate-form">
+    <h1>請輸入密碼</h1>
+    <input type="password" id="gate-password" autocomplete="off" autofocus>
+    <button type="submit">進入</button>
+    <p id="gate-error" class="error" hidden>密碼錯誤</p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <h1>BTCUSDT 4H 策略儀表板</h1>
+    <div class="meta">
+      <span id="last-updated">尚未更新</span>
+      <button id="refresh-btn">重新整理</button>
+    </div>
+  </header>
+
+  <div id="error-box" class="error-box" hidden></div>
+
+  <section id="status-card" class="card"></section>
+
+  <section class="card">
+    <h2>本次計算所用指標（最新一根K棒）</h2>
+    <div id="indicators-grid" class="grid"></div>
+  </section>
+
+  <section class="card">
+    <h2>回測績效統計（自資料起點至今，虛擬本金 1000U）</h2>
+    <div id="stats-grid" class="grid"></div>
+  </section>
+
+  <section class="card">
+    <h2>模擬交易紀錄（最新在上）</h2>
+    <div class="table-wrap">
+      <table id="trades-table">
+        <thead>
+          <tr>
+            <th>時間</th><th>方向</th><th>動作</th><th>價格</th><th>備註</th><th>此筆盈虧</th><th>盈虧%</th><th>之後總U</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="disclaimer">
+    本頁僅為個人策略訊號參考工具，資料來自 Binance 公開 API，所有計算皆為本機瀏覽器端模擬回測，不構成投資建議。
+    實際下單、停損、停利均需自行手動於交易所操作。
+  </p>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
