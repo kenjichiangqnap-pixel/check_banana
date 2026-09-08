@@ -277,6 +277,29 @@ function statBox(label, value, cls = "") {
   return `<div class="stat"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
 }
 
+function renderQuickStatus(result, lastClose) {
+  const box = document.getElementById("quick-status");
+  if (result.position === 0) {
+    box.innerHTML = `
+      <div class="qs-side flat">目前空手，無持倉</div>
+      <div class="qs-grid qs-grid-1">
+        <div class="qs-item"><div class="qs-label">目前價</div><div class="qs-value">${fmt(lastClose, 2)}</div></div>
+      </div>
+    `;
+    return;
+  }
+  const isLong = result.signal === "buy";
+  const entry = isLong ? result.buy_price : result.sell_price;
+  box.innerHTML = `
+    <div class="qs-side ${isLong ? "long" : "short"}">${isLong ? "做多" : "做空"} BTCUSDT</div>
+    <div class="qs-grid">
+      <div class="qs-item"><div class="qs-label">進場價</div><div class="qs-value">${fmt(entry, 2)}</div></div>
+      <div class="qs-item"><div class="qs-label">停損價</div><div class="qs-value">${fmt(result.stop_price, 2)}</div></div>
+      <div class="qs-item"><div class="qs-label">目前價</div><div class="qs-value">${fmt(lastClose, 2)}</div></div>
+    </div>
+  `;
+}
+
 function renderStatus(result, lastBar, ind, n) {
   const box = document.getElementById("status-card");
   const lastClose = ind.close[n - 1];
@@ -402,6 +425,7 @@ async function loadAndRender() {
     const result = runSimulation(bars, ind);
     const n = bars.length;
 
+    renderQuickStatus(result, ind.close[n - 1]);
     renderStatus(result, bars[n - 1], ind, n);
     renderIndicators(ind, n, bars[n - 1]);
     renderStats(result);
