@@ -56,9 +56,9 @@ const CONFIG = {
   ATR_LEN: 14,
   ATR_STOP: 2.0,
   ATR_TRAIL: 9.0,
-  ATR_TP: 100.0,
   RISK_PCT: 0.08,
   MAX_LEVERAGE: 10.0,
+  MARGIN_BUFFER: 0.97,
   FEE_RATE: 0.0005,
   ALLOW_SHORT: true,
   KLINE_LIMIT: 1500,
@@ -163,7 +163,7 @@ function runSimulation(bars, ind) {
 
   let usdt = CONFIG.initialUsdt;
   let position = 0, signal = "";
-  let buy_price = 0, sell_price = 0, stop_price = 0, take_price = 0, trail_extreme = 0;
+  let buy_price = 0, sell_price = 0, stop_price = 0, trail_extreme = 0;
   let qty = 0, entry_fee = 0, entry_total_u = 0, entry_time = null;
   const trades = [];
 
@@ -176,16 +176,14 @@ function runSimulation(bars, ind) {
       const newStop = trail_extreme - CONFIG.ATR_TRAIL * atrb;
       if (newStop > stop_price) stop_price = newStop;
       const shortSig = CONFIG.ALLOW_SHORT && ADX > CONFIG.ADX_THRESH && closeNow < emaT && closeNow < dl;
-      let exitPrice = null;
-      if (lowNow <= stop_price) exitPrice = stop_price;
-      else if (highNow >= take_price) exitPrice = take_price;
-      else if (shortSig) exitPrice = closeNow;
-      if (exitPrice !== null) {
+      const hit = closeNow <= stop_price;
+      if (hit || shortSig) {
+        const exitPrice = closeNow;
         const raw = (exitPrice - buy_price) * qty;
         const feeOut = CONFIG.FEE_RATE * exitPrice * qty;
         usdt += raw - feeOut;
         const b = raw - feeOut - entry_fee;
-        const reason = usdt <= 0 ? "爆倉" : b > 0 ? "停利" : "停損";
+        const reason = usdt <= 0 ? "爆倉" : (!hit && shortSig) ? "反向" : b > 0 ? "停利" : "停損";
         trades.push({ side: "多", entryTime: entry_time, entryPrice: buy_price, exitTime: bars[i].openTime, exitPrice, note: reason, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0 });
         position = 0; signal = "";
       }
@@ -194,16 +192,14 @@ function runSimulation(bars, ind) {
       const newStop = trail_extreme + CONFIG.ATR_TRAIL * atrb;
       if (newStop < stop_price) stop_price = newStop;
       const longSig = ADX > CONFIG.ADX_THRESH && closeNow > emaT && closeNow > dh;
-      let exitPrice = null;
-      if (highNow >= stop_price) exitPrice = stop_price;
-      else if (lowNow <= take_price) exitPrice = take_price;
-      else if (longSig) exitPrice = closeNow;
-      if (exitPrice !== null) {
+      const hit = closeNow >= stop_price;
+      if (hit || longSig) {
+        const exitPrice = closeNow;
         const raw = (sell_price - exitPrice) * qty;
         const feeOut = CONFIG.FEE_RATE * exitPrice * qty;
         usdt += raw - feeOut;
         const b = raw - feeOut - entry_fee;
-        const reason = usdt <= 0 ? "爆倉" : b > 0 ? "停利" : "停損";
+        const reason = usdt <= 0 ? "爆倉" : (!hit && longSig) ? "反向" : b > 0 ? "停利" : "停損";
         trades.push({ side: "空", entryTime: entry_time, entryPrice: sell_price, exitTime: bars[i].openTime, exitPrice, note: reason, pnlPct: entry_total_u > 0 ? (b / entry_total_u) * 100 : 0 });
         position = 0; signal = "";
       }
@@ -217,9 +213,10 @@ function runSimulation(bars, ind) {
         const stopDist = CONFIG.ATR_STOP * atrb;
         const riskAmt = CONFIG.RISK_PCT * usdt;
         qty = riskAmt / stopDist;
+        const notionalCap = CONFIG.MAX_LEVERAGE * usdt * CONFIG.MARGIN_BUFFER;
         let notional = qty * closeNow;
-        if (notional > CONFIG.MAX_LEVERAGE * usdt) {
-          qty = (CONFIG.MAX_LEVERAGE * usdt) / closeNow;
+        if (notional > notionalCap) {
+          qty = notionalCap / closeNow;
           notional = qty * closeNow;
         }
         const eq0 = usdt;
@@ -229,10 +226,10 @@ function runSimulation(bars, ind) {
         entry_time = bars[i].openTime;
         if (longSig) {
           position = 1; signal = "buy"; buy_price = closeNow; trail_extreme = highNow;
-          stop_price = buy_price - stopDist; take_price = buy_price + CONFIG.ATR_TP * atrb;
+          stop_price = buy_price - stopDist;
         } else {
           position = 1; signal = "sell"; sell_price = closeNow; trail_extreme = lowNow;
-          stop_price = sell_price + stopDist; take_price = sell_price - CONFIG.ATR_TP * atrb;
+          stop_price = sell_price + stopDist;
         }
       }
     }
